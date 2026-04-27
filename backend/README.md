@@ -25,6 +25,25 @@
 
 [Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
 
+## Render keep-alive (anti-sleep / anti-cold-start)
+
+This backend includes an explicit `keepalive` module:
+
+- `GET /api/health`: health endpoint used for pings
+- **Self-poller**: periodically requests `SELF_URL` to keep the Render web service warm
+- **DB daily touch job**: inserts + deletes a row in a dedicated table (`keepalive_db_touch`) to keep the database awake
+
+Environment variables (see root `README.md` for the full list):
+
+```env
+KEEPALIVE_ENABLED=true
+KEEPALIVE_INTERVAL_SECONDS=300
+SELF_URL=https://your-render-service.onrender.com/api/health
+
+DB_KEEPALIVE_ENABLED=true
+DB_KEEPALIVE_CRON=0 3 * * *
+```
+
 ## Project setup
 
 ```bash

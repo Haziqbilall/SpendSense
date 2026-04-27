@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { UsersModule } from './modules/users/users.module';
@@ -17,6 +18,7 @@ import { CategoriesModule } from './modules/categories/categories.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { EventsModule } from './common/events/events.module';
 import { AiModule } from './modules/ai/ai.module';
+import { KeepaliveModule } from './keepalive/keepalive.module';
 
 import { APP_INTERCEPTOR } from '@nestjs/core';
 import { CurrentUserInterceptor } from './common/interceptors/current-user.interceptor';
@@ -30,6 +32,7 @@ import { Category } from './modules/categories/categories.entity';
       envFilePath: ['.env', 'backend/.env'],
       isGlobal: true,
     }),
+    ScheduleModule.forRoot(),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
@@ -46,6 +49,7 @@ import { Category } from './modules/categories/categories.entity';
       inject: [ConfigService],
     }),
     TypeOrmModule.forFeature([Category]),
+    KeepaliveModule,
     EventsModule,
     UsersModule,
     UserProfilesModule,

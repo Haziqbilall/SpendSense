@@ -26,6 +26,7 @@ export class AiService {
   private readonly logger = new Logger(AiService.name);
   private llm: ChatGroq;
   private knowledgeBase: KnowledgeDocument[] = [];
+  private readonly plainTextAi: boolean;
 
   constructor(
     private readonly messageHistoryService: MessageHistoryService,
@@ -61,7 +62,50 @@ export class AiService {
       maxTokens: 500,
     });
 
+    this.plainTextAi =
+      (this.configService.get<string>('AI_PLAIN_TEXT') ?? 'true').toLowerCase() !==
+      'false';
+
     this.initializeKnowledgeBase();
+  }
+
+  private formatAiResponse(text: string): string {
+    if (!this.plainTextAi) return text;
+
+    let out = text;
+
+    // Remove code fences but keep inner content
+    out = out.replace(/```[\s\S]*?\n([\s\S]*?)```/g, '$1');
+
+    // Remove inline code ticks
+    out = out.replace(/`([^`]+)`/g, '$1');
+
+    // Remove emphasis markers (**bold**, __bold__, *italics*, _italics_)
+    out = out.replace(/\*\*([^*]+)\*\*/g, '$1');
+    out = out.replace(/__([^_]+)__/g, '$1');
+    out = out.replace(/\*([^*\n]+)\*/g, '$1');
+    out = out.replace(/_([^_\n]+)_/g, '$1');
+
+    // Convert markdown links [text](url) -> text
+    out = out.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1');
+
+    // Headings -> plain line
+    out = out.replace(/^\s{0,3}#{1,6}\s+/gm, '');
+
+    // Blockquotes -> plain line
+    out = out.replace(/^\s{0,3}>\s?/gm, '');
+
+    // Normalize bullets (keep as "- ")
+    out = out.replace(/^\s*•\s+/gm, '- ');
+    out = out.replace(/^\s*\*\s+/gm, '- ');
+
+    // Remove obvious emoji-only decoration at line start (keeps the text)
+    out = out.replace(/^\s*[✅❌📊💸🎯👋📨🚀]+\s*/gm, '');
+
+    // Collapse excessive blank lines
+    out = out.replace(/\n{3,}/g, '\n\n');
+
+    return out.trim();
   }
 
   private initializeKnowledgeBase() {
@@ -227,7 +271,8 @@ Use the following context from the knowledge base to answer the user's question:
 ${context}${historyContext}
 
 If the context doesn't contain enough information, use your general knowledge about personal finance.
-Be friendly, concise, and provide actionable advice. Use bullet points when listing items.
+Be friendly, concise, and provide actionable advice.
+Return plain text. Do not use Markdown (no **, # headings, or code fences). Use simple hyphen bullets when listing items.
 Remember the conversation context and refer back to it when relevant.
 
 User: ${message}`;
@@ -236,25 +281,27 @@ User: ${message}`;
 
       // Extract text from response
       if (typeof response === 'string') {
-        return response;
+        return this.formatAiResponse(response);
       } else if (response.content) {
         if (Array.isArray(response.content)) {
-          return response.content
+          return this.formatAiResponse(
+            response.content
             .map((block: any) =>
               typeof block === 'string' ? block : block.text || '',
             )
-            .join('');
+            .join(''),
+          );
         }
-        return String(response.content);
+        return this.formatAiResponse(String(response.content));
       }
-      return String(response);
+      return this.formatAiResponse(String(response));
     } catch (error: any) {
       this.logger.error(`❌ AI chat error: ${error.message}`);
       this.logger.error(`Error details: ${JSON.stringify(error, null, 2)}`);
       this.logger.warn(
         'Falling back to default response. Check your GROQ_API_KEY configuration.',
       );
-      return this.getFallbackResponse(message);
+      return this.formatAiResponse(this.getFallbackResponse(message));
     }
   }
 
@@ -1158,6 +1205,9 @@ Try me out! What would you like to do?`;
         message,
         conversationHistory,
       );
+
+      // Ensure AI-facing responses are plain text (no markdown) when enabled
+      aiResult.response = this.formatAiResponse(aiResult.response);
 
       // Save AI response to database
       await this.messageHistoryService.createAiMessage(

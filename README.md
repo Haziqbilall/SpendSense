@@ -188,7 +188,23 @@ DATABASE_URL=your_database_connection_string
 JWT_SECRET=your_jwt_secret_key
 GROQ_API_KEY=your_groq_api_key
 FRONTEND_URL=your_frontend_url
+
+# Make AI responses plain text (removes markdown like **bold**)
+AI_PLAIN_TEXT=true
+
+# Render keep-alive (prevents cold starts / sleeping)
+# Set SELF_URL to your Render backend URL + /api/health (NOT localhost) in production.
+KEEPALIVE_ENABLED=true
+KEEPALIVE_INTERVAL_SECONDS=300
+SELF_URL=http://localhost:3000/api/health
+
+# Render DB keep-alive (touch Postgres daily so it doesn't sleep)
+DB_KEEPALIVE_ENABLED=true
+# Default: 3:00 AM server time
+DB_KEEPALIVE_CRON=0 3 * * *
 ```
+
+Tip: you can copy `backend/.env.example` to `backend/.env` and fill in real values.
 
 ## Core Modules
 
