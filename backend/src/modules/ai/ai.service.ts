@@ -423,11 +423,19 @@ Keep it concise and actionable with specific numbers when possible.`;
       this.logger.log(`Generating AI insights for user ${userId}`);
 
       // Fetch user's financial data
-      const [expenses, budgets, savingsGoals] = await Promise.all([
+      const [expenses, budgets, savingsGoals, categories] = await Promise.all([
         this.expensesService.getAllExpenses(userId),
         this.budgetsService.getAllBudgets(userId),
         this.savingsGoalsService.getAllSavingsGoals(userId),
+        this.categoriesService.getAllCategories(),
       ]);
+
+      // `getAllExpenses()` returns `category_id` but not a joined `category` object.
+      // Build a lookup so AI insights correctly bucket spending by category name.
+      const categoryNameById = new Map<string, string>();
+      categories.forEach((c: any) => {
+        if (c?.id && c?.name) categoryNameById.set(String(c.id), String(c.name));
+      });
 
       // Calculate spending by category
       const spendingByCategory: Record<string, number> = {};
@@ -435,7 +443,11 @@ Keep it concise and actionable with specific numbers when possible.`;
       let totalSpent = 0;
 
       recentExpenses.forEach((expense: any) => {
-        const categoryName = expense.category?.name || 'Uncategorized';
+        const categoryId = expense.category_id ? String(expense.category_id) : '';
+        const categoryName =
+          expense.category?.name ||
+          (categoryId ? categoryNameById.get(categoryId) : undefined) ||
+          'Uncategorized';
         const amount = parseFloat(expense.amount || '0');
         spendingByCategory[categoryName] =
           (spendingByCategory[categoryName] || 0) + amount;
